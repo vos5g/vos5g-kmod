@@ -1,0 +1,52 @@
+name: Build modules
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache toolchain and kernel tree
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/kmod/xpack-arm-none-eabi-gcc-10.3.1-2.3
+            build/kmod/msm-4.14
+          key: kmod-${{ hashFiles('build.sh') }}
+
+      - name: Host packages
+        run: sudo apt-get update -q && sudo apt-get install -y -q bc bison flex libssl-dev
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Package
+        run: |
+          cd dist
+          tar -czf modules-4.14.117-perf.tar.gz modules-4.14.117-perf
+          sha256sum modules-4.14.117-perf.tar.gz > modules-4.14.117-perf.tar.gz.sha256
+          cat modules-4.14.117-perf/SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modules-4.14.117-perf
+          path: |
+            dist/modules-4.14.117-perf.tar.gz
+            dist/modules-4.14.117-perf.tar.gz.sha256
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/modules-4.14.117-perf.tar.gz dist/modules-4.14.117-perf.tar.gz.sha256 --clobber
