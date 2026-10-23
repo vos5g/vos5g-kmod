@@ -49,8 +49,13 @@ cat "$HERE/config/modules.fragment" >> "$K/.config"
 changed=$(diff <(gzip -dc "$HERE/config/config-$KVER.gz" | grep '=y$' | sort) <(grep '=y$' "$K/.config" | sort) \
   | grep '^[<>]' | grep -vE 'CONFIG_(TCP_CONG_ADVANCED|DEFAULT_CUBIC|PROJECT_ZX56|CHGBAT_DEBUG)=y' || true)
 [ -z "$changed" ] || { echo "refusing: built-in options would change:" >&2; echo "$changed" >&2; exit 1; }
+# The stick's config has LOCALVERSION_AUTO=y, so scripts/setlocalversion would
+# append git state (-g<hash>, -dirty) whenever the tree isn't a clean checkout
+# of the tag (e.g. restored from the CI cache). An empty .scmversion pins it.
+: > "$K/.scmversion"
 "${MK[@]}" -C "$K" -j"$(nproc)" modules_prepare >/dev/null
-grep -q "\"$KVER\"" "$K/include/generated/utsrelease.h" || { echo "kernel release is not $KVER" >&2; exit 1; }
+grep -q "\"$KVER\"" "$K/include/generated/utsrelease.h" || {
+  echo "kernel release is not $KVER: $(grep -o '"[^"]*"' "$K/include/generated/utsrelease.h")" >&2; exit 1; }
 
 for d in net/ipv4 net/ipv6 net/sched net/netfilter lib; do "${MK[@]}" -C "$K" -j"$(nproc)" M="$d" modules >/dev/null; done
 cp "$K"/net/ipv6/netfilter/{nf_nat_ipv6,nf_nat_masquerade_ipv6,ip6table_nat,ip6t_MASQUERADE}.ko \

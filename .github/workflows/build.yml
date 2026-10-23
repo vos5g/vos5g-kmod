@@ -15,10 +15,10 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Cache toolchain and kernel tree
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             build/kmod/xpack-arm-none-eabi-gcc-10.3.1-2.3
@@ -38,7 +38,7 @@ jobs:
           sha256sum modules-4.14.117-perf.tar.gz > modules-4.14.117-perf.tar.gz.sha256
           cat modules-4.14.117-perf/SHA256SUMS
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: modules-4.14.117-perf
           path: |
