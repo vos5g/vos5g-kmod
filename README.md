@@ -10,7 +10,7 @@ These modules are used by [vos5g-sdx55](https://github.com/vos5g/vos5g-sdx55): v
 
 | Group | Modules | What it gives |
 |---|---|---|
-| `wireguard` | `udp_tunnel`, `ip6_udp_tunnel`, `wireguard` (wireguard-linux-compat 1.0.20220627) | Kernel WireGuard. NetBird uses it automatically; Tailscale never does |
+| `wireguard` | `udp_tunnel`, `ip6_udp_tunnel`, `wireguard` (wireguard-linux-compat 1.0.20220627) | Kernel WireGuard. QManager's WireGuard page (kernel engine) and NetBird use it; Tailscale never does |
 | `ipv6nat` | `nf_nat_ipv6`, `nf_nat_masquerade_ipv6`, `ip6table_nat`, `ip6t_MASQUERADE` | IPv6 NAT, masquerade and DNAT |
 | `bbr` | `tcp_bbr`, `sch_fq` | BBR congestion control for the stick's own TCP |
 | `fqcodel` | `sch_fq_codel` | fq_codel queue discipline |
@@ -20,14 +20,16 @@ All 15 modules (about 250 KB) were loaded, used and unloaded on a real stick wit
 
 ### Kernel vs userspace WireGuard on the stick
 
-These are tunnel tests to a fast peer over USB, two runs each, on the single Cortex-A7 core:
+**For devices behind the stick, which is the usual case, the kernel module is about four times faster.** Through a commercial VPN (Privado, London, on O2 5G SA), a device behind the stick downloaded at **65 Mbit/s** with the kernel module and 17 Mbit/s with wireguard-go. A local test peer gave 39–48 against 13–16 Mbit/s. wireguard-go copies every forwarded packet through a TUN device to userspace and back, and on the single Cortex-A7 core that costs more than the encryption.
+
+Traffic that starts or ends on the stick itself behaves differently. These are tunnel tests to a fast peer over USB, two runs each:
 
 | | Kernel module | wireguard-go |
 |---|---|---|
 | Stick encrypts (sends into the tunnel) | about **114 Mbit/s** | about 36 Mbit/s |
-| Stick decrypts (receives from the tunnel) | about 25–30 Mbit/s | about **48 Mbit/s** |
+| Stick decrypts (receives into its own sockets) | about 25–30 Mbit/s | about **48 Mbit/s** |
 
-The kernel module wins when the stick sends, for example as an exit node serving downloads. It loses when the stick receives, because that path is CPU-bound in the kernel's receive processing; a larger network budget didn't help. The kernel has no `KERNEL_MODE_NEON`, so the scalar ARM cipher code is used. The tools used to measure this are in `tools/vcwg` and `tools/wgbench`.
+So wireguard-go is only ahead when the stick itself is the destination, for example a download to the stick. The kernel has no `KERNEL_MODE_NEON`, so the scalar ARM cipher code is used. The tools used to measure this are in `tools/vcwg` and `tools/wgbench`.
 
 ## How the modules are built
 
@@ -57,14 +59,20 @@ Not possible as modules on this kernel: **nftables** (struct layout), **eBPF, kp
 
 The stick needs vosclean from [vos5g-sdx55](https://github.com/vos5g/vos5g-sdx55).
 
-1. Upload:
+1. Get the modules: download `modules-4.14.117-perf.tar.gz` and its `.sha256` from [Releases](../../releases), then check and unpack them:
    ```bash
-   ./install.sh --modules /path/to/vos5g-kmod/dist/modules-4.14.117-perf
+   sha256sum -c modules-4.14.117-perf.tar.gz.sha256
+   tar -xzf modules-4.14.117-perf.tar.gz
+   ```
+   Or build them yourself with `./build.sh` (they land in `dist/modules-4.14.117-perf`).
+2. Upload them with vos5g-sdx55's installer:
+   ```bash
+   ./install.sh --modules /path/to/modules-4.14.117-perf
    ```
    It refuses if the modem runs a different kernel, and checks `SHA256SUMS` on the modem.
-2. Switch groups on in **QManager → System Settings → Kernel Modules**, or set `MODULES="bbr ..."` in `/data/vosclean/etc/vosclean.conf` and run `vosclean modules`.
-3. Enabled groups load at every boot. Switching a group off unloads it, unless something is still using it, in which case it goes at the next reboot.
-4. **Crash guard:** a marker on flash brackets the loading. If the stick crashes or resets during it, the next boot skips all modules and says so, until you retry from QManager or with `vosclean modules`.
+3. Switch groups on in **QManager → System Settings → Kernel Modules**, or set `MODULES="bbr ..."` in `/data/vosclean/etc/vosclean.conf` and run `vosclean modules`.
+4. Enabled groups load at every boot. Switching a group off unloads it, unless something is still using it, in which case it goes at the next reboot.
+5. **Crash guard:** a marker on flash brackets the loading. If the stick crashes or resets during it, the next boot skips all modules and says so, until you retry from QManager or with `vosclean modules`.
 
 ## Adding a module
 
