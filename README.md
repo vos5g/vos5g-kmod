@@ -4,7 +4,7 @@ Extra kernel modules for the **Tri Cascade VOS 5G** USB dongle (TRITOM SG500M2-X
 
 The stick's kernel loads unsigned modules. That means features it was built without can be added at runtime without touching the signed boot chain: nothing is flashed, and removing a module, or the whole set, puts the stick back as it was.
 
-These modules are used by [vos5g-sdx55](https://github.com/thalatamsainath/vos5g-sdx55): vosclean loads them, and QManager's **System Settings → Kernel Modules** page switches them on and off.
+These modules are used by [vos5g-sdx55](https://github.com/vos5g/vos5g-sdx55): vosclean loads them, and QManager's **System Settings → Kernel Modules** page switches them on and off.
 
 ## What's here
 
@@ -55,7 +55,7 @@ Not possible as modules on this kernel: **nftables** (struct layout), **eBPF, kp
 
 ## Installing on the stick
 
-The stick needs vosclean from [vos5g-sdx55](https://github.com/thalatamsainath/vos5g-sdx55).
+The stick needs vosclean from [vos5g-sdx55](https://github.com/vos5g/vos5g-sdx55).
 
 1. Upload:
    ```bash
